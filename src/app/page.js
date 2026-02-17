@@ -115,7 +115,7 @@ export default function Home() {
         <div className="flex flex-col gap-3 items-center">
           {/* Dashboard Navigation */}
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => window.location.assign("/dashboard")}
             className="bg-green-600 text-white px-6 py-3 rounded-lg
             hover:bg-green-700 transition"
           >
