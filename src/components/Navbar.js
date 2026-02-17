@@ -61,7 +61,7 @@ export default function Navbar() {
 
         {/* LEFT — LOGO */}
         <div
-          onClick={() => router.push("/dashboard")}
+          onClick={() => r(window.location.href = "/dashboard")}
           className="flex items-center gap-3 cursor-pointer group"
         >
           <div className="w-9 h-9 rounded-lg bg-black text-white flex items-center justify-center font-semibold group-hover:scale-105 transition">
@@ -122,7 +122,7 @@ export default function Navbar() {
                 {/* Dashboard */}
                 <button
                   onClick={() => {
-                    router.push("/dashboard");
+                    (window.location.href = "/dashboard");
                     setOpenMenu(false);
                   }}
                   className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition"

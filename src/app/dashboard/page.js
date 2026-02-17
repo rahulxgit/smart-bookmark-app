@@ -32,7 +32,7 @@ export default function Dashboard() {
         if (error) throw error;
 
         if (!data?.session) {
-          router.replace("/");
+          window.location.href = "/";
           return;
         }
 
@@ -40,7 +40,7 @@ export default function Dashboard() {
       } catch (err) {
         console.error("Auth error:", err);
         toast.error("Authentication required");
-        router.replace("/");
+        window.location.href = "/";
       } finally {
         setLoading(false);
       }

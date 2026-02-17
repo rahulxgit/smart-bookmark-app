@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import Link from "next/link";
 
-
 export default function Home() {
   const router = useRouter();
 
@@ -25,7 +24,7 @@ export default function Home() {
       // handle auth events properly
       if (event === "SIGNED_IN") {
         toast.success("Logged in successfully ✅");
-        router.push("/dashboard");
+        (window.location.href = "/dashboard");
       }
 
       if (event === "SIGNED_OUT") {
@@ -47,7 +46,7 @@ export default function Home() {
 
       // auto redirect if already logged in
       if (data.session) {
-        router.push("/dashboard");
+        router.replace("/dashboard");
       }
     } catch (err) {
       console.log("Session check error:", err);
@@ -65,7 +64,7 @@ export default function Home() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${location.origin}/dashboard`,
+          redirectTo: `window.location.origin`,
         },
       });
 
@@ -115,17 +114,16 @@ export default function Home() {
       ) : (
         <>
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => (window.location.href = "/dashboard")}
             className="bg-green-600 text-white px-6 py-3 rounded"
           >
             Go to Dashboard
           </button>
           <Link href="/dashboard">
-  <button className="bg-green-500 px-6 py-3 rounded">
-    Go to Dashboard
-  </button>
-</Link>
-
+            <button className="bg-green-500 px-6 py-3 rounded">
+              Go to Dashboard
+            </button>
+          </Link>
 
           <button
             onClick={signOut}
