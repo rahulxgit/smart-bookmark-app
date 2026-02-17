@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import BookmarkCard from "@/components/BookmarkCard";
 import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
+  const router = useRouter();
+
   // ---------------- STATE ----------------
   const [userId, setUserId] = useState(null);
   const [bookmarks, setBookmarks] = useState([]);
@@ -19,25 +22,32 @@ export default function Dashboard() {
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
 
-  // ---------------- GET USER (middleware already protects route) ----------------
+  // ---------------- AUTH CHECK (PRODUCTION SAFE) ----------------
   useEffect(() => {
     const init = async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const { data, error } = await supabase.auth.getSession();
 
-        if (user) setUserId(user.id);
+        if (error) throw error;
+
+        // if no session → redirect home
+        if (!data?.session) {
+          router.replace("/");
+          return;
+        }
+
+        setUserId(data.session.user.id);
       } catch (err) {
-        console.log("User fetch error:", err);
-        toast.error("Failed to load user");
+        console.log("Auth error:", err);
+        toast.error("Authentication failed");
+        router.replace("/");
       } finally {
         setLoading(false);
       }
     };
 
     init();
-  }, []);
+  }, [router]);
 
   // ---------------- FETCH BOOKMARKS ----------------
   const fetchBookmarks = async () => {
@@ -60,13 +70,13 @@ export default function Dashboard() {
   useEffect(() => {
     if (!userId) return;
 
-    // initial load
+    // initial fetch
     fetchBookmarks();
 
     const channel = supabase
       .channel("bookmarks-realtime-channel")
 
-      // INSERT event
+      // INSERT
       .on(
         "postgres_changes",
         {
@@ -84,7 +94,7 @@ export default function Dashboard() {
         }
       )
 
-      // DELETE event
+      // DELETE
       .on(
         "postgres_changes",
         {
@@ -100,7 +110,7 @@ export default function Dashboard() {
         }
       )
 
-      // UPDATE event (future proof)
+      // UPDATE
       .on(
         "postgres_changes",
         {
@@ -117,7 +127,6 @@ export default function Dashboard() {
           );
         }
       )
-
       .subscribe();
 
     return () => {
@@ -133,7 +142,7 @@ export default function Dashboard() {
     }));
   };
 
-  // ---------------- ADD BOOKMARK (Optimistic UI) ----------------
+  // ---------------- ADD BOOKMARK ----------------
   const addBookmark = async () => {
     setError("");
 
@@ -164,7 +173,7 @@ export default function Dashboard() {
 
       if (error) throw error;
 
-      // optimistic UI update
+      // optimistic update
       setBookmarks((prev) => [data, ...prev]);
 
       setForm({ title: "", url: "" });
@@ -178,14 +187,17 @@ export default function Dashboard() {
     }
   };
 
-  // ---------------- DELETE BOOKMARK (Optimistic UI) ----------------
+  // ---------------- DELETE BOOKMARK ----------------
   const deleteBookmark = async (id) => {
     try {
-      await supabase.from("bookmarks").delete().eq("id", id);
+      const { error } = await supabase
+        .from("bookmarks")
+        .delete()
+        .eq("id", id);
 
-      // optimistic UI
+      if (error) throw error;
+
       setBookmarks((prev) => prev.filter((b) => b.id !== id));
-
       toast.success("Bookmark deleted");
     } catch (err) {
       console.log("Delete error:", err);

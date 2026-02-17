@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import Link from "next/link";
+
 
 export default function Home() {
   const router = useRouter();
@@ -118,6 +120,12 @@ export default function Home() {
           >
             Go to Dashboard
           </button>
+          <Link href="/dashboard">
+  <button className="bg-green-500 px-6 py-3 rounded">
+    Go to Dashboard
+  </button>
+</Link>
+
 
           <button
             onClick={signOut}
