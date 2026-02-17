@@ -6,6 +6,12 @@ import BookmarkCard from "@/components/BookmarkCard";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 
+import {
+  getBookmarks,
+  createBookmark,
+  removeBookmark,
+} from "@/services/bookmarkService";
+
 export default function Dashboard() {
   const router = useRouter();
 
@@ -30,7 +36,6 @@ export default function Dashboard() {
 
         if (error) throw error;
 
-        // if no session → redirect home
         if (!data?.session) {
           router.replace("/");
           return;
@@ -52,13 +57,7 @@ export default function Dashboard() {
   // ---------------- FETCH BOOKMARKS ----------------
   const fetchBookmarks = async () => {
     try {
-      const { data, error } = await supabase
-        .from("bookmarks")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
+      const data = await getBookmarks();
       setBookmarks(data || []);
     } catch (err) {
       console.log("Fetch error:", err);
@@ -70,7 +69,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!userId) return;
 
-    // initial fetch
+    // initial load
     fetchBookmarks();
 
     const channel = supabase
@@ -129,9 +128,7 @@ export default function Dashboard() {
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => supabase.removeChannel(channel);
   }, [userId]);
 
   // ---------------- INPUT HANDLER ----------------
@@ -159,22 +156,14 @@ export default function Dashboard() {
     try {
       setAdding(true);
 
-      const { data, error } = await supabase
-        .from("bookmarks")
-        .insert([
-          {
-            title: form.title,
-            url: form.url,
-            user_id: userId,
-          },
-        ])
-        .select()
-        .single();
+      const newBookmark = await createBookmark({
+        title: form.title,
+        url: form.url,
+        user_id: userId,
+      });
 
-      if (error) throw error;
-
-      // optimistic update
-      setBookmarks((prev) => [data, ...prev]);
+      // optimistic UI
+      setBookmarks((prev) => [newBookmark, ...prev]);
 
       setForm({ title: "", url: "" });
       toast.success("Bookmark added successfully ✅");
@@ -190,14 +179,11 @@ export default function Dashboard() {
   // ---------------- DELETE BOOKMARK ----------------
   const deleteBookmark = async (id) => {
     try {
-      const { error } = await supabase
-        .from("bookmarks")
-        .delete()
-        .eq("id", id);
+      await removeBookmark(id);
 
-      if (error) throw error;
-
+      // optimistic UI
       setBookmarks((prev) => prev.filter((b) => b.id !== id));
+
       toast.success("Bookmark deleted");
     } catch (err) {
       console.log("Delete error:", err);

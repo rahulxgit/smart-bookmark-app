@@ -1,13 +1,15 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+
 import Navbar from "@/components/Navbar";
 import { Toaster } from "react-hot-toast";
+import { AuthProvider } from "@/context/AuthContext";
 
-// ---------------- FONTS ----------------
+// ---------------- FONTS (Performance Optimized) ----------------
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
-  display: "swap", // performance optimization
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -32,24 +34,29 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* Global Navigation */}
-        <Navbar />
+        {/* Global Providers */}
+        <AuthProvider>
 
-        {/* Global Toast Provider */}
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 3000,
-            style: {
-              borderRadius: "10px",
-              background: "#111827",
-              color: "#fff",
-            },
-          }}
-        />
+          {/* Global Navigation */}
+          <Navbar />
 
-        {/* Page Content */}
-        <main>{children}</main>
+          {/* Global Toast Notifications */}
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 3000,
+              style: {
+                borderRadius: "10px",
+                background: "#111827",
+                color: "#fff",
+              },
+            }}
+          />
+
+          {/* Page Content */}
+          <main>{children}</main>
+
+        </AuthProvider>
       </body>
     </html>
   );
