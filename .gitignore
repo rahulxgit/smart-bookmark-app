@@ -41,6 +41,11 @@ yarn-error.log*
 next-env.d.ts
 
 node_modules
-.env.local
 .next
+.env.local
+.env
+dist
+build
+.DS_Store
+
 
