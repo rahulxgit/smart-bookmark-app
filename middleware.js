@@ -1,36 +1,53 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 
-export async function middleware(req) {
-  const res = NextResponse.next();
+export async function middleware(request) {
+  const response = NextResponse.next();
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        get(name) {
-          return req.cookies.get(name)?.value;
+  try {
+    // Create Supabase server client
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        cookies: {
+          get(name) {
+            return request.cookies.get(name)?.value;
+          },
+          set(name, value, options) {
+            response.cookies.set({
+              name,
+              value,
+              ...options,
+            });
+          },
+          remove(name, options) {
+            response.cookies.set({
+              name,
+              value: "",
+              ...options,
+              maxAge: 0,
+            });
+          },
         },
-        set(name, value, options) {
-          res.cookies.set(name, value, options);
-        },
-        remove(name, options) {
-          res.cookies.set(name, "", { ...options, maxAge: 0 });
-        },
-      },
+      }
+    );
+
+    // Refresh session + get user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    // Protect dashboard routes
+    if (!user && request.nextUrl.pathname.startsWith("/dashboard")) {
+      return NextResponse.redirect(new URL("/", request.url));
     }
-  );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user && req.nextUrl.pathname.startsWith("/dashboard")) {
-    return NextResponse.redirect(new URL("/", req.url));
+    return response;
+  } catch (error) {
+    console.error("Middleware error:", error);
+    return response; // fail gracefully
   }
-
-  return res;
 }
 
 export const config = {

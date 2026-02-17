@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import BookmarkCard from "@/components/BookmarkCard";
 import toast from "react-hot-toast";
-import { useRouter } from "next/navigation";
-
 import {
   getBookmarks,
   createBookmark,
@@ -13,8 +11,6 @@ import {
 } from "@/services/bookmarkService";
 
 export default function Dashboard() {
-  const router = useRouter();
-
   // ---------------- STATE ----------------
   const [userId, setUserId] = useState(null);
   const [bookmarks, setBookmarks] = useState([]);
@@ -24,21 +20,21 @@ export default function Dashboard() {
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
 
-  // ---------------- AUTH CHECK ----------------
+  // ---------------- GET USER (SSR handles protection via middleware) ----------------
   useEffect(() => {
-    const checkAuth = async () => {
+    const init = async () => {
       try {
-        const { data, error } = await supabase.auth.getSession();
+        const { data, error } = await supabase.auth.getUser();
         if (error) throw error;
 
-        if (!data?.session) {
+        if (!data?.user) {
           window.location.href = "/";
           return;
         }
 
-        setUserId(data.session.user.id);
+        setUserId(data.user.id);
       } catch (err) {
-        console.error("Auth error:", err);
+        console.error("User fetch error:", err);
         toast.error("Authentication required");
         window.location.href = "/";
       } finally {
@@ -46,8 +42,8 @@ export default function Dashboard() {
       }
     };
 
-    checkAuth();
-  }, [router]);
+    init();
+  }, []);
 
   // ---------------- FETCH BOOKMARKS ----------------
   const fetchBookmarks = async () => {
@@ -69,9 +65,15 @@ export default function Dashboard() {
     const channel = supabase
       .channel("bookmarks-realtime")
 
+      // INSERT
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "bookmarks", filter: `user_id=eq.${userId}` },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "bookmarks",
+          filter: `user_id=eq.${userId}`,
+        },
         (payload) => {
           setBookmarks((prev) =>
             prev.some((b) => b.id === payload.new.id)
@@ -81,20 +83,36 @@ export default function Dashboard() {
         }
       )
 
+      // DELETE
       .on(
         "postgres_changes",
-        { event: "DELETE", schema: "public", table: "bookmarks", filter: `user_id=eq.${userId}` },
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "bookmarks",
+          filter: `user_id=eq.${userId}`,
+        },
         (payload) => {
-          setBookmarks((prev) => prev.filter((b) => b.id !== payload.old.id));
+          setBookmarks((prev) =>
+            prev.filter((b) => b.id !== payload.old.id)
+          );
         }
       )
 
+      // UPDATE
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "bookmarks", filter: `user_id=eq.${userId}` },
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "bookmarks",
+          filter: `user_id=eq.${userId}`,
+        },
         (payload) => {
           setBookmarks((prev) =>
-            prev.map((b) => (b.id === payload.new.id ? payload.new : b))
+            prev.map((b) =>
+              b.id === payload.new.id ? payload.new : b
+            )
           );
         }
       )
@@ -174,74 +192,59 @@ export default function Dashboard() {
   // ---------------- REUSABLE INPUT STYLE ----------------
   const inputStyle =
     "w-full border border-gray-300 rounded-lg px-4 py-3 bg-white " +
-    "text-gray-900 placeholder-gray-700 " + // strong visible placeholder
-    "focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent " +
-    "focus-visible:ring-2 focus-visible:ring-black transition";
+    "text-gray-900 placeholder-gray-700 " +
+    "focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition";
 
-  // ---------------- DASHBOARD UI ----------------
+  // ---------------- UI ----------------
   return (
     <main className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-3xl mx-auto space-y-12">
 
         {/* HEADER */}
-        <header className="space-y-2">
+        <header>
           <h1 className="text-4xl font-bold text-gray-900 tracking-tight">
             Bookmark Manager
           </h1>
-          <p className="text-gray-600 text-base">
-            Save, organize, and access your important websites securely in one place.
+          <p className="text-gray-600 mt-2">
+            Save, organize, and access your important websites securely.
           </p>
         </header>
 
         {/* ADD BOOKMARK FORM */}
-        <section
-          className="bg-white border rounded-2xl shadow-sm p-8 space-y-6"
-          aria-labelledby="add-bookmark-heading"
-        >
-          <div>
-            <h2
-              id="add-bookmark-heading"
-              className="text-xl font-semibold text-gray-900"
-            >
-              Add New Bookmark
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Enter a website title and URL to store it for future access.
-            </p>
-          </div>
-
-          {error && (
-            <div
-              role="alert"
-              className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-lg"
-            >
-              {error}
+        <section className="bg-white border rounded-2xl shadow-sm p-8">
+          <form onSubmit={addBookmark} className="space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">
+                Add New Bookmark
+              </h2>
+              <p className="text-sm text-gray-500">
+                Store your favorite websites for quick access.
+              </p>
             </div>
-          )}
 
-          <form onSubmit={addBookmark} className="space-y-5">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-lg">
+                {error}
+              </div>
+            )}
 
             {/* TITLE */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="text-sm font-medium text-gray-700">
                 Bookmark Title
               </label>
               <input
                 name="title"
                 value={form.title}
                 onChange={handleChange}
-                placeholder="Example: GitHub, Portfolio Website"
+                placeholder="Example: GitHub, Portfolio"
                 className={inputStyle}
-                aria-label="Bookmark title"
               />
-              <p className="text-xs text-gray-400 mt-1">
-                Use a clear name for easy recognition.
-              </p>
             </div>
 
             {/* URL */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="text-sm font-medium text-gray-700">
                 Website URL
               </label>
               <input
@@ -250,21 +253,16 @@ export default function Dashboard() {
                 onChange={handleChange}
                 placeholder="https://example.com"
                 className={inputStyle}
-                aria-label="Website URL"
               />
-              <p className="text-xs text-gray-400 mt-1">
-                Must begin with http:// or https://
-              </p>
             </div>
 
-            {/* SUBMIT */}
             <button
               type="submit"
               disabled={adding}
               className="w-full flex items-center justify-center gap-2
               bg-black text-white py-3 rounded-lg
               hover:opacity-90 active:scale-[0.99]
-              disabled:opacity-50 disabled:cursor-not-allowed transition"
+              disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {adding && (
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -275,7 +273,7 @@ export default function Dashboard() {
         </section>
 
         {/* BOOKMARK LIST */}
-        <section className="space-y-4" aria-live="polite">
+        <section className="space-y-4">
           {bookmarks.length === 0 ? (
             <div className="text-center py-12 bg-white border rounded-xl text-gray-500">
               <p className="text-lg font-medium">No bookmarks yet</p>

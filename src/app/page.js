@@ -9,22 +9,41 @@ import Link from "next/link";
 export default function Home() {
   const router = useRouter();
 
+  // ---------------- STATE ----------------
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
 
   // ---------------- CHECK SESSION + AUTH LISTENER ----------------
   useEffect(() => {
-    checkUser();
+    const init = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
 
+        setSession(data.session);
+
+        // auto redirect if already logged in
+        if (data.session) {
+          router.replace("/dashboard");
+        }
+      } catch (err) {
+        console.error("Session check error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    init();
+
+    // auth listener (login / logout updates UI instantly)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
 
-      // handle auth events properly
       if (event === "SIGNED_IN") {
         toast.success("Logged in successfully ✅");
-        (window.location.href = "/dashboard");
+        router.replace("/dashboard");
       }
 
       if (event === "SIGNED_OUT") {
@@ -35,27 +54,6 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  // ---------------- CHECK CURRENT SESSION ----------------
-  const checkUser = async () => {
-    try {
-      const { data, error } = await supabase.auth.getSession();
-
-      if (error) throw error;
-
-      setSession(data.session);
-
-      // auto redirect if already logged in
-      if (data.session) {
-        router.replace("/dashboard");
-      }
-    } catch (err) {
-      console.log("Session check error:", err);
-      toast.error("Session check failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // ---------------- GOOGLE LOGIN ----------------
   const signIn = async () => {
     try {
@@ -63,14 +61,11 @@ export default function Home() {
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: {
-          redirectTo: `window.location.origin`,
-        },
       });
 
       if (error) throw error;
     } catch (error) {
-      console.log("Login error:", error);
+      console.error("Login error:", error);
       toast.error("Login failed. Try again.");
       setLoading(false);
     }
@@ -80,12 +75,12 @@ export default function Home() {
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
-
       if (error) throw error;
 
       setSession(null);
+      router.refresh();
     } catch (err) {
-      console.log("Logout error:", err);
+      console.error("Logout error:", err);
       toast.error("Logout failed");
     }
   };
@@ -94,45 +89,55 @@ export default function Home() {
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
-        Loading...
+        <div className="animate-pulse text-gray-600 text-lg">
+          Loading...
+        </div>
       </div>
     );
   }
 
   // ---------------- UI ----------------
   return (
-    <div className="flex h-screen flex-col items-center justify-center gap-4">
-      <h1 className="text-3xl font-bold">Smart Bookmark App</h1>
+    <main className="min-h-screen flex flex-col items-center justify-center gap-6 bg-gray-50 px-4">
+      <h1 className="text-4xl font-bold text-gray-900 tracking-tight">
+        Smart Bookmark App
+      </h1>
 
       {!session ? (
         <button
           onClick={signIn}
-          className="bg-black text-white px-6 py-3 rounded hover:opacity-90"
+          className="bg-black text-white px-6 py-3 rounded-lg
+          hover:opacity-90 active:scale-[0.98] transition"
         >
           Login with Google
         </button>
       ) : (
-        <>
+        <div className="flex flex-col gap-3 items-center">
+          {/* Dashboard Navigation */}
           <button
-            onClick={() => (window.location.href = "/dashboard")}
-            className="bg-green-600 text-white px-6 py-3 rounded"
+            onClick={() => router.push("/dashboard")}
+            className="bg-green-600 text-white px-6 py-3 rounded-lg
+            hover:bg-green-700 transition"
           >
             Go to Dashboard
           </button>
+
+          {/* Alternative Link (kept your feature) */}
           <Link href="/dashboard">
-            <button className="bg-green-500 px-6 py-3 rounded">
+            <button className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition">
               Go to Dashboard
             </button>
           </Link>
 
+          {/* Logout */}
           <button
             onClick={signOut}
-            className="bg-red-500 text-white px-6 py-3 rounded"
+            className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition"
           >
             Logout
           </button>
-        </>
+        </div>
       )}
-    </div>
+    </main>
   );
 }
