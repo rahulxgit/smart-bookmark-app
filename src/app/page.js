@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -13,45 +13,61 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
 
-  // ---------------- CHECK SESSION + AUTH LISTENER ----------------
+  // Prevent duplicate login toast
+  const hasShownLoginToast = useRef(false);
+
+  // ---------------- SESSION CHECK + AUTH LISTENER ----------------
   useEffect(() => {
+    let isMounted = true;
+
     const init = async () => {
       try {
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
 
-        setSession(data.session);
+        if (!isMounted) return;
 
-        // auto redirect if already logged in
-        if (data.session) {
+        setSession(data?.session ?? null);
+
+        // Auto redirect if already logged in
+        if (data?.session) {
           router.replace("/dashboard");
         }
       } catch (err) {
         console.error("Session check error:", err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     init();
 
-    // auth listener (login / logout updates UI instantly)
+    // Listen for auth changes (login/logout)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!isMounted) return;
+
       setSession(session);
 
-      if (event === "SIGNED_IN") {
+      // Ignore initial restore event
+      if (event === "INITIAL_SESSION") return;
+
+      if (event === "SIGNED_IN" && !hasShownLoginToast.current) {
+        hasShownLoginToast.current = true;
         toast.success("Logged in successfully ✅");
         router.replace("/dashboard");
       }
 
       if (event === "SIGNED_OUT") {
-        toast.success("Logged out");
+        toast.success("Logged out successfully");
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, [router]);
 
   // ---------------- GOOGLE LOGIN ----------------
@@ -66,7 +82,7 @@ export default function Home() {
       if (error) throw error;
     } catch (error) {
       console.error("Login error:", error);
-      toast.error("Login failed. Try again.");
+      toast.error("Login failed. Please try again.");
       setLoading(false);
     }
   };
@@ -88,54 +104,75 @@ export default function Home() {
   // ---------------- LOADING UI ----------------
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-pulse text-gray-600 text-lg">
-          Loading...
+          Checking authentication...
         </div>
       </div>
     );
   }
 
+  // ---------------- REUSABLE BUTTON STYLE ----------------
+  const primaryBtn =
+    "px-6 py-3 rounded-lg font-medium text-white transition active:scale-[0.98]";
+
   // ---------------- UI ----------------
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center gap-6 bg-gray-50 px-4">
-      <h1 className="text-4xl font-bold text-gray-900 tracking-tight">
-        Smart Bookmark App
-      </h1>
+    <main className="min-h-screen flex flex-col items-center justify-center gap-8 bg-gray-50 px-4">
 
+      {/* APP HEADER */}
+      <div className="text-center space-y-2 max-w-md">
+        <h1 className="text-4xl font-bold text-gray-900 tracking-tight">
+          Smart Bookmark App
+        </h1>
+        <p className="text-gray-600">
+          Save, organize, and access your favorite websites securely with realtime sync.
+        </p>
+      </div>
+
+      {/* AUTH UI */}
       {!session ? (
         <button
           onClick={signIn}
-          className="bg-black text-white px-6 py-3 rounded-lg
-          hover:opacity-90 active:scale-[0.98] transition"
+          className={`${primaryBtn} bg-black hover:opacity-90`}
         >
-          Login with Google
+          Continue with Google
         </button>
       ) : (
-        <div className="flex flex-col gap-3 items-center">
-          {/* Dashboard Navigation */}
+        <div className="flex flex-col gap-4 items-center">
+
+          {/* Dashboard Navigation — Window Redirect */}
           <button
             onClick={() => window.location.assign("/dashboard")}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg
-            hover:bg-green-700 transition"
+            className={`${primaryBtn} bg-green-600 hover:bg-green-700`}
           >
             Go to Dashboard
           </button>
 
-          {/* Alternative Link (kept your feature) */}
-          <Link href="/dashboard">
-            <button className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition">
-              Go to Dashboard
-            </button>
+          {/* Dashboard Navigation — Next Link */}
+          <Link
+            href="/dashboard"
+            className={`${primaryBtn} bg-green-500 hover:bg-green-600`}
+          >
+            Open Dashboard
           </Link>
 
-          {/* Logout */}
-          <button
-            onClick={signOut}
-            className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition"
-          >
-            Logout
-          </button>
+          {/* Professional Action Group */}
+          <div className="flex gap-3 mt-2">
+            <Link
+              href="/dashboard"
+              className="bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
+            >
+              Dashboard
+            </Link>
+
+            <button
+              onClick={signOut}
+              className="bg-red-500 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       )}
     </main>
