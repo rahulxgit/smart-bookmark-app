@@ -6,6 +6,8 @@ This project was developed as part of a **72-hour micro-challenge assignment pro
 
 👉 **Live Demo:**
 https://smart-bookmark-app-sigma-murex.vercel.app/
+👉 **Loom Ref Link:**
+https://www.loom.com/share/71832d00480b434eb2835f2d4fd92eee
 
 ---
 
